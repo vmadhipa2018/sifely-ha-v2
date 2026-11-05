@@ -161,9 +161,10 @@ class SifelyCoordinator(DataUpdateCoordinator[dict[int, dict[str, Any]]]):
     def _process_records(
         self, lid: int, cache: dict[str, Any], records: list[dict[str, Any]]
     ) -> None:
-        cache["records"] = [_pick(r, RECORD_FIELDS) for r in records]
         if not records:
+            # Nothing in the date window: keep the last known activity
             return
+        cache["records"] = [_pick(r, RECORD_FIELDS) for r in records]
 
         newest = max(int(r.get("recordId", 0)) for r in records)
         previous = self._last_record_id.get(lid)

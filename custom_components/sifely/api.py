@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from typing import Any
 
 import aiohttp
@@ -19,6 +20,8 @@ from .const import (
     API_PASSCODE_LIST,
     API_RECORD_LIST,
     ERR_GATEWAY_REQUIRED,
+    RECORD_PAGE_SIZE,
+    RECORD_WINDOW_DAYS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -141,14 +144,31 @@ class SifelyClient:
         )
         return data.get("list") or []
 
-    async def get_records(self, lock_id: int, page_size: int = 20) -> list[dict[str, Any]]:
-        """Newest-first activity records. Only the first page is fetched."""
+    async def get_records(
+        self, lock_id: int, limit: int = 20, days: int = RECORD_WINDOW_DAYS
+    ) -> list[dict[str, Any]]:
+        """Return the newest activity records from the last `days` days.
+
+        The API does not document its sort order, so one page of up to
+        RECORD_PAGE_SIZE records is fetched for an explicit date range and
+        sorted newest-first here.
+        """
+        end_ms = int(time.time() * 1000)
+        start_ms = end_ms - days * 86_400_000
         data = await self._request(
             "GET",
             API_RECORD_LIST,
-            {"lockId": lock_id, "pageNo": 1, "pageSize": page_size},
+            {
+                "lockId": lock_id,
+                "pageNo": 1,
+                "pageSize": RECORD_PAGE_SIZE,
+                "startDate": start_ms,
+                "endDate": end_ms,
+            },
         )
-        return data.get("list") or []
+        records = data.get("list") or []
+        records.sort(key=lambda r: r.get("lockDate") or 0, reverse=True)
+        return records[:limit]
 
     # ── Gateway-dependent calls ─────────────────────────────────────────────
 
