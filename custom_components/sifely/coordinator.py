@@ -95,7 +95,8 @@ class SifelyCoordinator(DataUpdateCoordinator[dict[int, dict[str, Any]]]):
             return await call
         except (SifelyAuthError, SifelySubscriptionError, SifelyRateLimitError):
             raise
-        except SifelyGatewayRequiredError:
+        except SifelyGatewayRequiredError as err:
+            _LOGGER.debug("Sifely %s needs a gateway: %s", label, err)
             return None
         except SifelyError as err:
             _LOGGER.warning("Sifely %s failed: %s", label, err)
@@ -161,8 +162,9 @@ class SifelyCoordinator(DataUpdateCoordinator[dict[int, dict[str, Any]]]):
     def _process_records(
         self, lid: int, cache: dict[str, Any], records: list[dict[str, Any]]
     ) -> None:
+        _LOGGER.debug("Sifely records %s: %d returned", lid, len(records))
         if not records:
-            # Nothing in the date window: keep the last known activity
+            # Keep the last known activity instead of clearing it
             return
         cache["records"] = [_pick(r, RECORD_FIELDS) for r in records]
 

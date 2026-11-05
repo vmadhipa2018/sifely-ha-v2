@@ -6,19 +6,20 @@ from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
+    RestoreSensor,
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE
+from homeassistant.const import PERCENTAGE, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DEFAULT_CALL_QUOTA, DOMAIN
 from .coordinator import SifelyCoordinator
-from .entity import SifelyLockEntity
+from .entity import SifelyAccountEntity, SifelyLockEntity
 
 RECENT_ACTIVITY_COUNT = 10
 
@@ -40,6 +41,9 @@ async def async_setup_entry(
         entities.append(SifelyBatterySensor(coordinator, lock_id))
         entities.append(SifelyPasscodeCountSensor(coordinator, lock_id))
         entities.append(SifelyLastActivitySensor(coordinator, lock_id))
+    entities.append(SifelyCallsRemainingSensor(coordinator, entry.entry_id))
+    entities.append(SifelyCallsUsedSensor(coordinator, entry.entry_id))
+    entities.append(SifelyCallsByHomeAssistantSensor(coordinator, entry.entry_id))
     async_add_entities(entities)
 
 
@@ -125,3 +129,99 @@ class SifelyLastActivitySensor(SifelyLockEntity, SensorEntity):
                 for r in records[:RECENT_ACTIVITY_COUNT]
             ]
         }
+
+
+# ── API usage ─────────────────────────────────────────────────────────────
+
+
+class SifelyCallsRemainingSensor(SifelyAccountEntity, SensorEntity):
+    """Calls left in the current billing cycle, from X-RateLimit-Remaining."""
+
+    _attr_name = "Calls remaining"
+    _attr_icon = "mdi:counter"
+    _attr_native_unit_of_measurement = "calls"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: SifelyCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_api_calls_remaining"
+
+    @property
+    def native_value(self) -> int | None:
+        return self.coordinator.client.calls_remaining
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        client = self.coordinator.client
+        return {
+            "call_quota": client.call_limit or DEFAULT_CALL_QUOTA,
+            "quota_from_api": client.call_limit is not None,
+            "device_count": client.device_count,
+        }
+
+
+class SifelyCallsUsedSensor(SifelyAccountEntity, SensorEntity):
+    """Calls used in the current billing cycle (quota minus remaining).
+
+    Counts every client using this API key, not only Home Assistant.
+    """
+
+    _attr_name = "Calls used this cycle"
+    _attr_icon = "mdi:chart-bar"
+    _attr_native_unit_of_measurement = "calls"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: SifelyCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_api_calls_used"
+
+    @property
+    def native_value(self) -> int | None:
+        client = self.coordinator.client
+        if client.calls_remaining is None:
+            return None
+        quota = client.call_limit or DEFAULT_CALL_QUOTA
+        return max(0, quota - client.calls_remaining)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        client = self.coordinator.client
+        quota = client.call_limit or DEFAULT_CALL_QUOTA
+        used = self.native_value
+        return {
+            "call_quota": quota,
+            "percent_used": round(used * 100 / quota, 1) if used is not None else None,
+        }
+
+
+class SifelyCallsByHomeAssistantSensor(SifelyAccountEntity, RestoreSensor):
+    """Running total of metered calls made by this integration.
+
+    Survives restarts, so long-term statistics show calls per month.
+    """
+
+    _attr_name = "Calls by Home Assistant"
+    _attr_icon = "mdi:home-import-outline"
+    _attr_native_unit_of_measurement = "calls"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: SifelyCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator, entry_id)
+        self._attr_unique_id = f"{entry_id}_api_calls_by_ha"
+        self._base = 0
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_sensor_data()
+        if last is not None and last.native_value is not None:
+            try:
+                self._base = int(float(last.native_value))
+            except (TypeError, ValueError):
+                self._base = 0
+
+    @property
+    def native_value(self) -> int:
+        return self._base + self.coordinator.client.calls_made

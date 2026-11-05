@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -38,4 +38,20 @@ class SifelyLockEntity(CoordinatorEntity[SifelyCoordinator]):
             model=lock.get("lockName"),
             name=lock.get("lockAlias") or lock.get("lockName") or f"Sifely {self._lock_id}",
             sw_version=detail.get("firmwareRevision"),
+        )
+
+
+class SifelyAccountEntity(CoordinatorEntity[SifelyCoordinator]):
+    """Base for entities that describe the Sifely API account, not a lock."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator: SifelyCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"account_{entry_id}")},
+            manufacturer="Sifely",
+            name="Sifely API",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url="https://connect.sifely.com",
         )
