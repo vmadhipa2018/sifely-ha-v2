@@ -34,8 +34,9 @@ RECORD_INTERVAL = 7200        # activity records per lock: every 2 h
 PASSCODE_INTERVAL = 21600     # passcode list per lock: every 6 h
 STATE_INTERVAL = 1800         # open state per lock (gateway locks only): every 30 min
 
-# Activity records: one call per poll asks for this many days, up to the
-# API maximum page size, and keeps the newest entries.
+# Activity records: each poll asks for this many days, up to the
+# API maximum page size. If that is empty, it fetches the newest records
+# with no date range instead.
 RECORD_WINDOW_DAYS = 30
 RECORD_PAGE_SIZE = 200
 
