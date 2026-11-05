@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect Sifely",
+        "description": "Enter your Sifely Open API key from connect.sifely.com (Account & API Key). This is not your app password.",
+        "data": {
+          "api_key": "API key"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sifely API key needed",
+        "description": "Enter a valid Sifely Open API key from connect.sifely.com to continue.",
+        "data": {
+          "api_key": "API key"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "The API key was rejected. Check that you copied the whole key.",
+      "cannot_connect": "Could not reach the Sifely API. Try again in a moment.",
+      "subscription_inactive": "Your Sifely subscription is not active. Check your plan on connect.sifely.com.",
+      "rate_limited": "Your Sifely API quota is used up for this period."
+    },
+    "abort": {
+      "already_configured": "This Sifely account is already set up.",
+      "reauth_successful": "Sifely API key updated.",
+      "reauth_failed": "The entry could not be found. Remove it and add Sifely again."
+    }
+  }
+}

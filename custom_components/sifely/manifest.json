@@ -1,0 +1,14 @@
+{
+  "domain": "sifely",
+  "name": "Sifely Smart Lock",
+  "codeowners": [
+    "@vmadhipa2018"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/vmadhipa2018/sifely-ha-v2",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/vmadhipa2018/sifely-ha-v2/issues",
+  "requirements": [],
+  "version": "2.0.0"
+}
